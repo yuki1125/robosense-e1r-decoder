@@ -1,0 +1,441 @@
+{
+  "sha256": "e5e3529e4ddf883376448d4e20fe1dd21a979ed8b37a96b8c7a8d7d3f43028eb",
+  "size": 17843496,
+  "stats": {
+    "pcap_packets": 14184,
+    "udp_port_6699": 14184,
+    "received": 14184,
+    "msop_packets": 14184,
+    "valid_msop": 14184,
+    "frames": 50,
+    "partial_frames": 2,
+    "points": 1361664,
+    "duplicates": 0,
+    "sequence_gaps": 2,
+    "order_anomalies": 0,
+    "invalid_packets": 0,
+    "invalid_length": 0,
+    "invalid_magic": 0,
+    "malformed_packet": 0,
+    "valid_difop": 0
+  },
+  "payload_lengths": {
+    "1200": 14184
+  },
+  "capture_start": 1770316586.980631,
+  "capture_end": 1770316591.905034,
+  "lidar_start": 69423.708223,
+  "lidar_end": 69428.634604,
+  "distance_min": 0.0,
+  "distance_max": 29.415,
+  "nonzero_points": 1110206,
+  "finite_xyz": true,
+  "frames": [
+    {
+      "frame_index": 0,
+      "packet_count": 258,
+      "start_timestamp": 69423.708223,
+      "end_timestamp": 69423.795952,
+      "complete": false,
+      "reasons": [
+        "capture_start_unverified",
+        "sequence_gaps",
+        "sequence_extent_unverified"
+      ]
+    },
+    {
+      "frame_index": 1,
+      "packet_count": 288,
+      "start_timestamp": 69423.800221,
+      "end_timestamp": 69423.895952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 2,
+      "packet_count": 288,
+      "start_timestamp": 69423.900221,
+      "end_timestamp": 69423.995952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 3,
+      "packet_count": 288,
+      "start_timestamp": 69424.000221,
+      "end_timestamp": 69424.095951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 4,
+      "packet_count": 288,
+      "start_timestamp": 69424.100221,
+      "end_timestamp": 69424.195952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 5,
+      "packet_count": 288,
+      "start_timestamp": 69424.20022099999,
+      "end_timestamp": 69424.295952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 6,
+      "packet_count": 288,
+      "start_timestamp": 69424.30021999999,
+      "end_timestamp": 69424.395951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 7,
+      "packet_count": 288,
+      "start_timestamp": 69424.400221,
+      "end_timestamp": 69424.495952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 8,
+      "packet_count": 288,
+      "start_timestamp": 69424.500221,
+      "end_timestamp": 69424.595952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 9,
+      "packet_count": 288,
+      "start_timestamp": 69424.600221,
+      "end_timestamp": 69424.695952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 10,
+      "packet_count": 288,
+      "start_timestamp": 69424.70022099999,
+      "end_timestamp": 69424.795952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 11,
+      "packet_count": 288,
+      "start_timestamp": 69424.800221,
+      "end_timestamp": 69424.895952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 12,
+      "packet_count": 288,
+      "start_timestamp": 69424.900221,
+      "end_timestamp": 69424.995952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 13,
+      "packet_count": 288,
+      "start_timestamp": 69425.000221,
+      "end_timestamp": 69425.095952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 14,
+      "packet_count": 288,
+      "start_timestamp": 69425.10022,
+      "end_timestamp": 69425.195951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 15,
+      "packet_count": 288,
+      "start_timestamp": 69425.20022099999,
+      "end_timestamp": 69425.29595100001,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 16,
+      "packet_count": 288,
+      "start_timestamp": 69425.300221,
+      "end_timestamp": 69425.395952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 17,
+      "packet_count": 288,
+      "start_timestamp": 69425.400221,
+      "end_timestamp": 69425.495952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 18,
+      "packet_count": 288,
+      "start_timestamp": 69425.500221,
+      "end_timestamp": 69425.595951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 19,
+      "packet_count": 288,
+      "start_timestamp": 69425.600221,
+      "end_timestamp": 69425.695952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 20,
+      "packet_count": 288,
+      "start_timestamp": 69425.70022099999,
+      "end_timestamp": 69425.795952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 21,
+      "packet_count": 288,
+      "start_timestamp": 69425.800221,
+      "end_timestamp": 69425.895952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 22,
+      "packet_count": 288,
+      "start_timestamp": 69425.900221,
+      "end_timestamp": 69425.995952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 23,
+      "packet_count": 288,
+      "start_timestamp": 69426.000221,
+      "end_timestamp": 69426.095951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 24,
+      "packet_count": 288,
+      "start_timestamp": 69426.100221,
+      "end_timestamp": 69426.195952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 25,
+      "packet_count": 288,
+      "start_timestamp": 69426.20022099999,
+      "end_timestamp": 69426.295952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 26,
+      "packet_count": 288,
+      "start_timestamp": 69426.30021999999,
+      "end_timestamp": 69426.395951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 27,
+      "packet_count": 288,
+      "start_timestamp": 69426.400221,
+      "end_timestamp": 69426.495952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 28,
+      "packet_count": 288,
+      "start_timestamp": 69426.500221,
+      "end_timestamp": 69426.595952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 29,
+      "packet_count": 288,
+      "start_timestamp": 69426.600221,
+      "end_timestamp": 69426.695952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 30,
+      "packet_count": 288,
+      "start_timestamp": 69426.70022099999,
+      "end_timestamp": 69426.795952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 31,
+      "packet_count": 288,
+      "start_timestamp": 69426.800221,
+      "end_timestamp": 69426.895952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 32,
+      "packet_count": 288,
+      "start_timestamp": 69426.900221,
+      "end_timestamp": 69426.995952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 33,
+      "packet_count": 288,
+      "start_timestamp": 69427.000221,
+      "end_timestamp": 69427.095952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 34,
+      "packet_count": 288,
+      "start_timestamp": 69427.10022,
+      "end_timestamp": 69427.195951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 35,
+      "packet_count": 288,
+      "start_timestamp": 69427.20022099999,
+      "end_timestamp": 69427.29595100001,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 36,
+      "packet_count": 288,
+      "start_timestamp": 69427.300221,
+      "end_timestamp": 69427.395952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 37,
+      "packet_count": 288,
+      "start_timestamp": 69427.400221,
+      "end_timestamp": 69427.495952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 38,
+      "packet_count": 288,
+      "start_timestamp": 69427.500221,
+      "end_timestamp": 69427.595951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 39,
+      "packet_count": 288,
+      "start_timestamp": 69427.600221,
+      "end_timestamp": 69427.695952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 40,
+      "packet_count": 288,
+      "start_timestamp": 69427.70022099999,
+      "end_timestamp": 69427.795952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 41,
+      "packet_count": 288,
+      "start_timestamp": 69427.800221,
+      "end_timestamp": 69427.895952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 42,
+      "packet_count": 288,
+      "start_timestamp": 69427.900221,
+      "end_timestamp": 69427.995952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 43,
+      "packet_count": 288,
+      "start_timestamp": 69428.000221,
+      "end_timestamp": 69428.095951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 44,
+      "packet_count": 288,
+      "start_timestamp": 69428.100221,
+      "end_timestamp": 69428.195952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 45,
+      "packet_count": 288,
+      "start_timestamp": 69428.20022099999,
+      "end_timestamp": 69428.295952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 46,
+      "packet_count": 288,
+      "start_timestamp": 69428.30021999999,
+      "end_timestamp": 69428.395951,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 47,
+      "packet_count": 288,
+      "start_timestamp": 69428.400221,
+      "end_timestamp": 69428.495952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 48,
+      "packet_count": 288,
+      "start_timestamp": 69428.500221,
+      "end_timestamp": 69428.595952,
+      "complete": true,
+      "reasons": []
+    },
+    {
+      "frame_index": 49,
+      "packet_count": 102,
+      "start_timestamp": 69428.600221,
+      "end_timestamp": 69428.634604,
+      "complete": false,
+      "reasons": [
+        "end_unverified"
+      ]
+    }
+  ]
+}

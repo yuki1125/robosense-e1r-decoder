@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "e1r-decoder"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23", "dpkt>=1.9.8"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+viewer = ["open3d>=0.19,<0.20"]
+
+[tool.setuptools.packages.find]
+include = ["e1r_decoder*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

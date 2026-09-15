@@ -1,0 +1,18 @@
+{
+  "received": 14184,
+  "msop_packets": 14184,
+  "valid_msop": 14184,
+  "frames": 50,
+  "partial_frames": 2,
+  "points": 1361664,
+  "duplicates": 0,
+  "sequence_gaps": 2,
+  "order_anomalies": 0,
+  "invalid_packets": 0,
+  "invalid_length": 0,
+  "invalid_magic": 0,
+  "malformed_packet": 0,
+  "valid_difop": 0,
+  "rendered_frames": 50,
+  "display_skipped_frames": 0
+}
