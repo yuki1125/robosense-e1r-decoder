@@ -110,7 +110,7 @@ last_partial = assembler.flush()
 
 公式ソースの固定版を根拠に、distance×0.005 m、signed direction÷32768でXYZを計算します。
 軸変換・ROI・intensity除外・距離除外はありません。distance=0の点も保持します。
-公式既定の0–200 m判定との違いは [VALIDATION.md](VALIDATION.md) に記載しています。
+公式は既定で0–200 mの距離判定を行いますが、本デコーダは範囲外でもraw値からXYZを復元します。
 
 LiDAR時刻は6-byte秒＋4-byteマイクロ秒、point time offsetもマイクロ秒です。
 `timestamp = packet_timestamp + time_offset` とします。
@@ -124,6 +124,18 @@ PCAPのUnix時刻とは一致しません。同期状態・epochは検証して�
 `complete` は観測できたsequenceの整合性を示し、送信された全データの到達保証ではありません。
 一度も観測できなかった末尾、フレーム全体の欠落、大きな順序逆転と真の巻き戻りの区別は、
 このsequence方式だけでは証明できません。`sequence_gaps` は前進跳躍の合計で、UDP総欠落数とは異なります。
+
+## 検証結果の要約
+
+2026-09-15、Windows x86_64 / Python 3.12で検証しました。
+
+- pytest: 33件成功。公開PCAPから14,184パケット・1,361,664点・50フレーム（partial 2）を復元。
+- 公式rs_driverとの全点比較でXYZ・timestampの最大差0、intensity・フレーム境界も一致。
+- localhostへの等速再送は無欠落。Open3D実ウィンドウでの描画も確認済み。最大速度再送では欠落あり。
+- IMUは合成DIFOPのみで検証済み。実DIFOP・実機接続・Jetsonでの動作は未検証です。
+
+詳細レポート・結果JSON・スクリーンショットはリポジトリに含めません。
+テスト・再検証用スクリプトは残しており、生成した検証結果は `.gitignore` で追跡対象外にしています。
 
 ## 公式比較の再現
 

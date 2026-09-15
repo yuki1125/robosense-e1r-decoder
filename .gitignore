@@ -9,3 +9,8 @@ testdata/*.pcap
 testdata/*.pcapng
 .env
 .env.*
+
+# Local validation reports and generated evidence
+/VALIDATION.md
+/validation_*.json
+/docs/validation/
