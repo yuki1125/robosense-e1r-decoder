@@ -337,5 +337,5 @@ $env:ZIG_GLOBAL_CACHE_DIR = Join-Path (Get-Location) 'build/zig-cache'
 
 ## 出典・ライセンス
 
-- [RoboSense rs_driver](https://github.com/RoboSense-LiDAR/rs_driver/tree/897b14d3bdb6186a75df27ba51b65b5bd5557723)：パケット仕様と分割処理の一次情報。BSD-3-Clause通知は `licenses/rs_driver.txt`。
-- [EdgeFirstAI lidarpub](https://github.com/EdgeFirstAI/lidarpub/tree/c7d4da23d6c9b33a06dda70e623b28cfbf767f65)：実測PCAP。ライセンスは `licenses/lidarpub.txt`。
+- [RoboSense rs_driver](https://github.com/RoboSense-LiDAR/rs_driver/tree/897b14d3bdb6186a75df27ba51b65b5bd5557723)：パケット仕様の参照元およびフレーム分割処理の移植元。関連する著作権通知・BSD-3-Clause条件・免責事項は [licenses/rs_driver.txt](licenses/rs_driver.txt) に保持しています。公式ドライバ本体は同梱していません。
+- 実測PCAPはリポジトリに同梱していません。必要な場合のみ [EdgeFirstAI lidarpub](https://github.com/EdgeFirstAI/lidarpub/tree/c7d4da23d6c9b33a06dda70e623b28cfbf767f65) から取得します。外部データの利用条件は取得元で確認してください。
