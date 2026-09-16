@@ -125,70 +125,64 @@ python -m e1r_decoder.viewer --bind-ip 0.0.0.0 --msop-port 6699
 
 ## 4. Pythonで点群を取得する
 
-次のコードを `receive_points.py` として保存し、実行する。1〜2章のインストールと接続設定が前提。
-このコード自体がUDPを受信するため、liveやviewerを別に起動する必要はない。
-実機がない場合は、5章のPCAP再送で試せる。
+`E1RSensor` を使うと、通常のループから `frame, imu = sensor.read()` でデータを取得できる。
+UDP受信と復号は内部のスレッドで動き続けるため、後処理をコールバックに書く必要はない。
 
-処理の流れは `receive()` で受信 → `Pipeline` で復号・フレームの組み立て → `on_frame()` で後処理。
-フレームがまとまるたびに `on_frame()` が呼ばれる。
+次のコードを `receive_points.py` として保存する。1〜2章のインストールと接続設定が前提。
+liveやviewerは同時に起動しない。実機がない場合は、5章のPCAP再送で試せる。
 
 ```python
 import numpy as np
-
-from e1r_decoder.live import receive
-from e1r_decoder.pipeline import Pipeline
-
-
-def on_frame(frame):
-    """1フレーム分の点群を処理する。"""
-    if not frame.complete:
-        print(f"Frame {frame.frame_index}: 不完全なフレームをスキップ {frame.reasons}")
-        return
-
-    points = frame.points
-    xyz = np.column_stack([points["x"], points["y"], points["z"]])
-    intensity = points["intensity"]
-    timestamps = points["timestamp"]
-
-    print(f"Frame {frame.frame_index}: {len(xyz)}点")
-    print(f"  先頭の点 XYZ [m]: {xyz[0]}")
-    print(f"  intensity: {intensity[0]}, timestamp [s]: {timestamps[0]:.6f}")
-
-    # 後処理の呼び出し例
-    # detect_objects(xyz)
-    # slam.update(xyz, timestamps)
+from e1r_decoder import E1RSensor
 
 
 def main():
-    pipeline = Pipeline(on_frame=on_frame)
-    try:
-        receive(
-            pipeline,
-            bind_ip="0.0.0.0",  # PC側で待ち受けるIP
-            msop_port=6699,      # 点群
-            difop_port=7788,     # IMU等（この例では復号・集計のみ）
-            on_ready=lambda: print("受信待機中。終了するにはCtrl+C", flush=True),
-        )
-    except KeyboardInterrupt:
-        print("受信終了")
-    finally:
-        # 残りの不完全なフレームをon_frameに渡し、統計を表示する
-        print(pipeline.finish())
+    with E1RSensor(bind_ip="0.0.0.0", msop_port=6699, difop_port=7788) as sensor:
+        print("受信待機中。終了するにはCtrl+C", flush=True)
+        while True:
+            try:
+                frame, imu = sensor.read(timeout=2.0)
+            except TimeoutError:
+                print("フレーム待機中：接続とセンサーの送信設定を確認")
+                continue
+
+            points = frame.points
+            xyz = np.column_stack([points["x"], points["y"], points["z"]])
+            intensity = points["intensity"]
+            timestamps = points["timestamp"]
+            print(f"Frame {frame.frame_index}: {len(points)}点")
+
+            if imu is not None:
+                print(f"加速度の生の値: {imu.accel_x_raw}, {imu.accel_y_raw}, {imu.accel_z_raw}")
+
+            # ここに後処理を書く
+            # detect_objects(xyz)
+            # slam.update(xyz, timestamps)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
 ```
 
 ```bash
 python receive_points.py
 ```
 
+- `read()` は新しいフレームを待ち、フレームとIMUを返す。`timeout` 秒以内に取得できなければ `TimeoutError`。省略時は取得まで待つ。
+- `frame.points` はXYZ・反射強度・時刻などを持つNumPy構造化配列。フレーム情報も使えるよう、配列だけでなく `frame` を返す。
+- `imu` はフレームがまとまった時点で最後に受信したIMU。未受信なら `None`。点群と時刻同期した値ではなく、更新が止まれば古い値が返る。必要に応じて `timestamp` と `receive_timestamp` を確認する。
+- 既定では完全なフレームのみ取得する。不完全なフレームも必要なら `complete_only=False` を指定する。
+- 待機キューは既定で1フレーム。後処理が遅いと古いフレームを捨てて最新を残す。破棄数は `sensor.dropped_frames`、キュー容量は `queue_size` で指定できる。
+- `with` を抜けると受信スレッドを停止し、UDPポートを解放する。
+
 ### フレームとは
 
 複数のUDPパケットを、1回分のスキャンとしてまとめた点群。
 公開PCAPでは約0.1秒に1フレーム（約10 Hz）、通常288パケット・27,648点が記録されている。
-パケットのシーケンス番号から次のスキャンへの切り替わりを検出し、直前のフレームを `on_frame()` に渡す。固定のパケット数で分割する方式ではない。
+パケットのシーケンス番号から次のスキャンへの切り替わりを検出し、直前のフレームを取り出せる状態にする。固定のパケット数で分割する方式ではない。
 
 受信開始直後や終了時、パケット欠落時などは不完全なフレーム（`frame.complete == False`）になる。
 上のサンプルでは、これをスキップする。`complete` は観測したシーケンス番号の整合性に基づく判定であり、全データの到達を保証するものではない。
@@ -206,10 +200,9 @@ Nはフレーム内の点数。例えば `xyz[0]` は先頭の点のx・y・zを
 ゼロ距離の除外や対象範囲の絞り込みは、後処理側で行う。
 スキャン中にもセンサーが移動する場合は、各点の時刻を使って動きによる点群の歪みを補正できる。
 
-**このサンプルでは受信・復号・on_frameを同じスレッドで実行する。**
-時間のかかる後処理を直接呼び出すと、その間は受信処理が止まり、パケット欠落につながる。
-物体検出やSLAMなどは、容量制限付きのキューを介して別スレッドや別プロセスに渡す構成にする。
-Open3Dビューアでは受信・復号と描画を別スレッドに分け、表示待ちのフレームを最新の1つに絞っている。
+受信・復号は内部スレッド、後処理は呼び出し側のスレッドで実行する。
+全フレームの保存や全IMUサンプルの取得が必要な用途では、この最新データ取得APIではなく、`Pipeline` の `on_frame` / `on_imu` を使う。
+CPU負荷の高いPython処理は受信スレッドにも影響するため、必要に応じて後処理を別プロセスへ分ける。UDP自体も無欠落を保証しない。
 
 ## 5. 実機なしで試す
 
