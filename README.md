@@ -398,8 +398,3 @@ $env:ZIG_GLOBAL_CACHE_DIR = Join-Path (Get-Location) 'build/zig-cache'
 
 `python -m scripts.inspect_pcap` でPCAPの統計を生成します。
 `python -m scripts.smoke_viewer` で約8秒の実ウィンドウ＋localhost再送試験を行い、画像と統計を `output/` に保存します。
-
-## 出典・ライセンス
-
-- [RoboSense rs_driver](https://github.com/RoboSense-LiDAR/rs_driver/tree/897b14d3bdb6186a75df27ba51b65b5bd5557723)：パケット仕様の参照元およびフレーム分割処理の移植元。関連する著作権通知・BSD-3-Clause条件・免責事項は [licenses/rs_driver.txt](licenses/rs_driver.txt) に保持しています。公式ドライバ本体は同梱していません。
-- 実測PCAPはリポジトリに同梱していません。必要な場合のみ [EdgeFirstAI lidarpub](https://github.com/EdgeFirstAI/lidarpub/tree/c7d4da23d6c9b33a06dda70e623b28cfbf767f65) から取得します。外部データの利用条件は取得元で確認してください。
