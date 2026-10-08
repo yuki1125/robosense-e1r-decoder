@@ -66,3 +66,44 @@ def test_receiver_failure_closes_visualizer(monkeypatch):
     with pytest.raises(RuntimeError, match="address in use"):
         viewer.run(args, fake)
     assert calls == ["closed"]
+
+
+@pytest.mark.parametrize("exit_on_end", [False, True])
+def test_file_end_and_window_close(monkeypatch, exit_on_end):
+    calls = []
+    state = {"polls_after_render": 0, "rendered": False}
+    class FakeVisualizer:
+        def create_window(self, **kwargs):
+            return True
+        def get_render_option(self):
+            return SimpleNamespace()
+        def poll_events(self):
+            if state["rendered"]:
+                state["polls_after_render"] += 1
+            return state["polls_after_render"] < 3
+        def add_geometry(self, cloud):
+            state["rendered"] = True
+            return True
+        def reset_view_point(self, **kwargs):
+            pass
+        def update_renderer(self):
+            pass
+        def destroy_window(self):
+            calls.append("closed")
+    def playback(path, on_frame, **kwargs):
+        points = np.zeros(1, dtype=POINT_DTYPE)
+        on_frame(SimpleNamespace(points=points, complete=True))
+        return {"frames": 1}
+    def no_udp(*args, **kwargs):
+        pytest.fail("File playback must not bind UDP sockets")
+    monkeypatch.setattr(viewer, "play_capture", playback)
+    monkeypatch.setattr(viewer, "receive", no_udp)
+    fake = SimpleNamespace(visualization=SimpleNamespace(Visualizer=FakeVisualizer),
+                           geometry=SimpleNamespace(PointCloud=SimpleNamespace),
+                           utility=SimpleNamespace(Vector3dVector=lambda x: x))
+    args = SimpleNamespace(pcap="test.pcapng", rate=1, loop=False, exit_on_end=exit_on_end,
+                           msop_port=6699, difop_port=7788, source_ip=None, duration=1,
+                           width=100, height=100, point_size=2, fps=1000, stats_json=None)
+    stats = viewer.run(args, fake)
+    assert stats["rendered_frames"] == 1 and calls == ["closed"]
+    assert state["polls_after_render"] == (0 if exit_on_end else 3)
