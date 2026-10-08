@@ -1,0 +1,45 @@
+name: Test x86_64 and ARM64
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+        python: ['3.10', '3.11']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libgomp1 xvfb
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[test,viewer]'
+          python -m pip check
+      - name: Verify runtime
+        run: |
+          python -c "import platform, numpy, open3d; print(platform.machine(), platform.python_version(), numpy.__version__, open3d.__version__)"
+      - name: Fetch PCAP and build official reference
+        run: |
+          python -m scripts.fetch_pcap
+          git clone https://github.com/RoboSense-LiDAR/rs_driver.git vendor/rs_driver
+          git -C vendor/rs_driver checkout 897b14d3bdb6186a75df27ba51b65b5bd5557723
+          mkdir -p build
+          c++ -std=c++14 -O2 -Ivendor/rs_driver/src scripts/rs_reference.cpp -o build/rs_reference
+      - name: Unit and integration tests
+        run: python -m pytest -q
+      - name: UDP replay and Open3D smoke test
+        run: xvfb-run -a python -m scripts.smoke_viewer
