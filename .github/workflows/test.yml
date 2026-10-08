@@ -43,3 +43,12 @@ jobs:
         run: python -m pytest -q
       - name: UDP replay and Open3D smoke test
         run: xvfb-run -a python -m scripts.smoke_viewer
+      - name: Retain UDP and viewer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: udp-viewer-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            output/viewer_smoke*
+            validation_udp_rate_*.json
+          if-no-files-found: warn
