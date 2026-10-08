@@ -239,6 +239,38 @@ CPU負荷の高いPython処理は受信スレッドにも影響するため、�
 
 公開PCAPを使い、ファイルからの復号とUDP受信を試せる。このPCAPにDIFOPは含まれないため、確認できるのは点群の処理のみ。
 
+### 保存済みのPCAP / PCAPNGをOpen3Dで表示する
+
+保存したE1Rのキャプチャファイルを直接開き、フレームごとに再生表示できる。センサー接続やUDP再送は不要。
+Open3Dの導入後、ターミナル1つで実行する。
+
+```bash
+python -m pip install -e '.[viewer]'
+python -m e1r_decoder.viewer --pcap "recordings/scan.pcap"
+```
+
+PCAPNGも同じコマンドで読み込める。形式は拡張子ではなくファイルの内容から判別する。
+
+```bash
+python -m e1r_decoder.viewer --pcap "recordings/scan.pcapng"
+```
+
+記録された受信時刻の間隔で等速再生し、終了後は最後の点群を表示したままにする。マウスで視点を操作し、ウィンドウを閉じるかCtrl+Cで終了する。
+
+```bash
+# 0.5倍速で繰り返し再生
+python -m e1r_decoder.viewer --pcap "recordings/scan.pcapng" --rate 0.5 --loop
+
+# 再生終了と同時にウィンドウを閉じる
+python -m e1r_decoder.viewer --pcap "recordings/scan.pcap" --exit-on-end
+```
+
+- `--rate 2` は2倍速、`--rate 0` は待ち時間なし。描画が追いつかないフレームは省略し、最新の点群を表示する。
+- `--msop-port` と `--difop-port` はファイル内の送信先ポートに合わせる。複数センサーの記録では `--source-ip` で1台を指定する。
+- 先頭・末尾などの不完全なフレームも表示する。繰り返し再生では毎回フレームの組み立てをリセットする。
+- 表示するのは点群。DIFOPがあれば復号・集計するが、IMUは描画しない。
+- 対象はE1RのEthernet UDPキャプチャ。別機種の点群データや、任意のPCAPを表示する機能ではない。
+
 ### PCAPから直接復号する
 
 ```bash
@@ -283,7 +315,9 @@ python -m e1r_decoder.replay --pcap testdata/e1r_frames.pcap --dst-ip 127.0.0.1 
 
 | オプション | 対象 | 内容 |
 |---|---|---|
-| `--msop-port 6699` / `--difop-port 7788` | live・viewer | センサーの送信先ポートに合わせる |
+| `--pcap PATH` | viewer | PCAP / PCAPNGを直接再生。省略時は実UDP受信 |
+| `--rate 0.5` / `--loop` / `--exit-on-end` | viewer（ファイル入力） | 再生速度／繰り返し／再生終了時に閉じる |
+| `--msop-port 6699` / `--difop-port 7788` | live・viewer | センサーまたは記録内の送信先ポートに合わせる |
 | `--source-ip IP` | live・viewer | 指定したセンサーからのみ受信 |
 | `--duration 10` | live・viewer | 約10秒で終了 |
 | `--debug 3` | live・decode_pcap | 最初の3個の有効MSOPパケットの詳細を表示 |
