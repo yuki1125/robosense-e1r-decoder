@@ -10,7 +10,11 @@ dependencies = ["numpy>=1.23", "dpkt>=1.9.8"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
-viewer = ["open3d>=0.19,<0.20"]
+viewer = [
+    "open3d==0.18.0; sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'arm64')",
+    "numpy<2; sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'arm64')",
+    "open3d>=0.19,<0.20; sys_platform != 'linux' or (platform_machine != 'aarch64' and platform_machine != 'arm64')",
+]
 
 [tool.setuptools.packages.find]
 include = ["e1r_decoder*"]
