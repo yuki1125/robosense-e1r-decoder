@@ -372,3 +372,43 @@ python -m scripts.validate_reference --executable build/rs_reference
 
 `python -m scripts.inspect_pcap` でPCAPの統計を確認できる。
 `python -m scripts.smoke_viewer` は、UDP再送とOpen3D表示を組み合わせた試験を実行し、画像と統計を `output/` に保存する。
+
+### UDP viewer validation
+
+The live Open3D viewer receives and decodes UDP in a spawned process. Open3D
+render calls can hold Python's GIL; a receiver thread in the rendering process
+cannot drain its UDP socket during such a call. The input process uses a
+one-slot latest-frame mailbox and a bounded pipe, and the display keeps its own
+one-slot mailbox. Slow rendering may skip display frames without blocking
+packet reception. All Open3D operations remain on the main thread. Programs
+calling `viewer.run()` must use an `if __name__ == "__main__":` guard.
+
+The checks have separate guarantees:
+
+- Offline decoding and the pinned C++ reference comparison verify packet,
+  point, timestamp, and frame correctness without UDP timing.
+- The 1x UDP tests and real Open3D smoke require all 14,184 packets,
+  1,361,664 points, 50 frames, and 2 partial frames. The capture already has
+  `sequence_gaps == 2`; this is the baseline, not a zero-gap recording.
+- The smoke sender runs in its own process at the recorded rate (`rate=1`).
+  It starts after both receive sockets are bound. The receiver finishes at the
+  exact packet count; 30 seconds is a failure watchdog, not the replay length.
+  Missing packets, additional gaps, invalid packets, or observed kernel drops
+  still fail the smoke. A 300 ms GIL-holding render-stall regression also runs
+  with a small per-socket buffer, without changing OS settings.
+- The existing `rate=0` UDP case is maximum-speed stress. It records loss and
+  checks exact point data when no loss occurs; it does not promise lossless
+  reception at unlimited rates.
+
+`output/viewer_smoke_sender.json` records count, rate, and actual sender time.
+`output/viewer_smoke.json` includes actual `msop_rcvbuf_bytes` /
+`difop_rcvbuf_bytes` (the OS may cap requests), decoder counts,
+`rendered_frames`, and `display_skipped_frames`. The latter includes
+`input_skipped_frames` from the input mailbox. Linux additionally reports
+`udp_socket_drops` from the sockets' `/proc/net/udp` entries before closing;
+this field is omitted if those counters are unavailable, never inferred from
+sequence gaps. CI retains the smoke output and UDP stress evidence even on
+failure.
+
+Hosted ARM64 CI and localhost replay do not validate a physical Jetson Orin,
+sensor Ethernet delivery, real DIFOP/IMU data, or unlimited-rate performance.

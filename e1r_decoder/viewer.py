@@ -5,29 +5,10 @@ import threading
 import time
 import numpy as np
 from .constants import MSOP_PORT, DIFOP_PORT
-from .live import receive
-from .pipeline import Pipeline
+from .mailbox import LatestFrame
+from .viewer_input import receive_isolated
 from .decode_pcap import report
 from .playback import play_capture
-
-
-class LatestFrame:
-    """One-slot mailbox: slow rendering never queues old frames."""
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.frame = None
-        self.skipped = 0
-
-    def put(self, frame):
-        with self.lock:
-            if self.frame is not None:
-                self.skipped += 1
-            self.frame = frame
-
-    def take(self):
-        with self.lock:
-            frame, self.frame = self.frame, None
-            return frame
 
 
 def display_arrays(points):
@@ -40,13 +21,12 @@ def display_arrays(points):
     return xyz[finite], np.repeat(brightness[:, None], 3, axis=1)
 
 
-def run(args, o3d):
+def run(args, o3d, *, on_ready=lambda: None):
     mailbox = LatestFrame()
     stop = threading.Event()
     done = threading.Event()
     errors = []
     stats = {}
-    pipeline = Pipeline(mailbox.put)
     rendered = 0
     capture = getattr(args, "pcap", None)
 
@@ -60,15 +40,19 @@ def run(args, o3d):
                     msop_port=args.msop_port, difop_port=args.difop_port,
                     source_ip=args.source_ip))
             else:
-                receive(pipeline, bind_ip=args.bind_ip, msop_port=args.msop_port,
-                        difop_port=args.difop_port, source_ip=args.source_ip,
-                        duration=args.duration, stop_event=stop,
-                        on_ready=lambda: print("READY: UDP receiver / Open3D viewer", flush=True))
+                def ready():
+                    print("READY: UDP receiver / Open3D viewer", flush=True)
+                    on_ready()
+                options = dict(bind_ip=args.bind_ip, msop_port=args.msop_port,
+                               difop_port=args.difop_port, source_ip=args.source_ip,
+                               duration=args.duration,
+                               max_packets=getattr(args, "max_packets", 0),
+                               receive_buffer_bytes=getattr(args, "receive_buffer_bytes", 4 * 1024 * 1024))
+                stats.update(receive_isolated(options, mailbox.put,
+                                             stop_event=stop, on_ready=ready))
         except Exception as error:
             errors.append(error)
         finally:
-            if not capture:
-                stats.update(pipeline.finish())
             done.set()
 
     vis = o3d.visualization.Visualizer()
@@ -125,7 +109,7 @@ def run(args, o3d):
         if thread is not None:
             thread.join()
         vis.destroy_window()  # Open3D requires the main thread.
-        stats.update(rendered_frames=rendered, display_skipped_frames=mailbox.skipped)
+        stats.update(rendered_frames=rendered, display_skipped_frames=mailbox.skipped + stats.get("input_skipped_frames", 0))
         report(stats, args.stats_json)
     if errors:
         raise RuntimeError(f"Input failed: {errors[0]}") from errors[0]
