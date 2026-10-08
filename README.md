@@ -37,6 +37,37 @@ python -m pip install -e .
 
 新しいターミナルを開いたときも、`source .venv/bin/activate` で仮想環境を有効にする。
 
+### Jetson / Linux ARM64
+
+ARM64（aarch64）でも受信・復号・保存・`E1RSensor.read()` は同じコードを使う。CUDAは不要。
+Jetson OrinではJetPack 6系（Ubuntu 22.04）のPython 3.10を想定する。32bit ARMとPython 3.9以前は対象外。
+
+コードを取得したフォルダーで実行する。
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-venv python3-pip
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m e1r_decoder.live --bind-ip 0.0.0.0 --msop-port 6699
+```
+
+3D表示も使う場合は、受信を止めてから次を実行する。
+
+```bash
+sudo apt-get install -y libgl1 libgomp1
+python -m pip install -e '.[viewer]'
+python -m e1r_decoder.viewer --fps 10
+```
+
+Linux ARM64のviewerは **Python 3.10 / 3.11** が対象。ARM64向け公式wheelがあるOpen3D 0.18.0とNumPy 1.xを自動選択する。その他の環境では従来のOpen3D 0.19を使う。
+Python 3.12以降のLinux ARM64では基本機能のみ利用でき、viewer用の依存関係はインストールできない。表示する場合はPython 3.10 / 3.11の環境を用意する。
+Open3DにはデスクトップとOpenGLが必要。SSHのみの環境では `live` または `E1RSensor` で取得・保存する。
+
+依存パッケージの根拠：[Open3D公式wheel一覧](https://pypi.org/project/open3d/0.18.0/#files)、[Open3D ARM対応](https://www.open3d.org/docs/0.19.0/arm.html)、[JetPack 6の構成](https://developer.nvidia.com/embedded/jetpack-sdk-60)。Jetson実機での受信・描画・処理速度は未検証。
+
 ### Windows（PowerShell）
 
 ```powershell
