@@ -1,4 +1,4 @@
-"""Live Open3D display; decoding stays on the shared UDP pipeline."""
+"""Live and PCAP/PCAPNG Open3D display using the common decoder."""
 import argparse
 import math
 import threading
@@ -8,6 +8,7 @@ from .constants import MSOP_PORT, DIFOP_PORT
 from .live import receive
 from .pipeline import Pipeline
 from .decode_pcap import report
+from .playback import play_capture
 
 
 class LatestFrame:
@@ -47,17 +48,27 @@ def run(args, o3d):
     stats = {}
     pipeline = Pipeline(mailbox.put)
     rendered = 0
+    capture = getattr(args, "pcap", None)
 
     def worker():
         try:
-            receive(pipeline, bind_ip=args.bind_ip, msop_port=args.msop_port,
-                    difop_port=args.difop_port, source_ip=args.source_ip,
-                    duration=args.duration, stop_event=stop,
-                    on_ready=lambda: print("READY: UDP receiver / Open3D viewer", flush=True))
+            if capture:
+                print(f"PLAYBACK: {capture}", flush=True)
+                stats.update(play_capture(
+                    capture, mailbox.put, stop_event=stop, rate=args.rate,
+                    loop=args.loop, duration=args.duration,
+                    msop_port=args.msop_port, difop_port=args.difop_port,
+                    source_ip=args.source_ip))
+            else:
+                receive(pipeline, bind_ip=args.bind_ip, msop_port=args.msop_port,
+                        difop_port=args.difop_port, source_ip=args.source_ip,
+                        duration=args.duration, stop_event=stop,
+                        on_ready=lambda: print("READY: UDP receiver / Open3D viewer", flush=True))
         except Exception as error:
             errors.append(error)
         finally:
-            stats.update(pipeline.finish())
+            if not capture:
+                stats.update(pipeline.finish())
             done.set()
 
     vis = o3d.visualization.Visualizer()
@@ -72,8 +83,10 @@ def run(args, o3d):
         cloud = o3d.geometry.PointCloud()
         added = False
         fitted_complete = False
-        thread = threading.Thread(target=worker, name="e1r-udp")
+        thread = threading.Thread(target=worker, name="e1r-input")
+        deadline = time.monotonic() + args.duration if args.duration else math.inf
         thread.start()
+        announced_end = False
         while True:
             started = time.monotonic()
             if not vis.poll_events():
@@ -97,6 +110,12 @@ def run(args, o3d):
                 rendered += 1
             vis.update_renderer()
             if finished:
+                if errors or not capture or getattr(args, "exit_on_end", False):
+                    break
+                if not announced_end:
+                    print("Playback finished. Close the window or press Ctrl+C to exit.", flush=True)
+                    announced_end = True
+            if time.monotonic() >= deadline:
                 break
             time.sleep(max(0, 1/args.fps-(time.monotonic()-started)))
     except KeyboardInterrupt:
@@ -109,12 +128,16 @@ def run(args, o3d):
         stats.update(rendered_frames=rendered, display_skipped_frames=mailbox.skipped)
         report(stats, args.stats_json)
     if errors:
-        raise RuntimeError(f"UDP receiver failed: {errors[0]}") from errors[0]
+        raise RuntimeError(f"Input failed: {errors[0]}") from errors[0]
     return stats
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Display live E1R point clouds with Open3D")
+    parser = argparse.ArgumentParser(description="Display live or captured E1R point clouds with Open3D")
+    parser.add_argument("--pcap", help="PCAP or PCAPNG file; omit for live UDP reception")
+    parser.add_argument("--rate", type=float, default=1.0, help="File playback speed; 0 decodes without waiting")
+    parser.add_argument("--loop", action="store_true", help="Repeat file playback")
+    parser.add_argument("--exit-on-end", action="store_true", help="Close when file playback finishes")
     parser.add_argument("--bind-ip", default="0.0.0.0")
     parser.add_argument("--msop-port", type=int, default=MSOP_PORT)
     parser.add_argument("--difop-port", type=int, default=DIFOP_PORT)
@@ -126,6 +149,10 @@ def main():
     parser.add_argument("--duration", type=float, default=0, help="Stop after N seconds; 0 waits until window closes")
     parser.add_argument("--stats-json")
     args = parser.parse_args()
+    if not math.isfinite(args.rate) or args.rate < 0:
+        parser.error("rate must be finite and nonnegative")
+    if not args.pcap and (args.loop or args.exit_on_end or args.rate != 1):
+        parser.error("--loop, --exit-on-end and --rate require --pcap")
     for name in ("fps", "point_size", "width", "height"):
         value = getattr(args, name)
         if not math.isfinite(value) or value <= 0:
