@@ -1,4 +1,6 @@
 import argparse
+import os
+from pathlib import Path
 import selectors
 import socket
 import time
@@ -7,7 +9,8 @@ from .decode_pcap import output_args, make_pipeline, report
 
 def receive(pipeline, *, bind_ip="0.0.0.0", msop_port=MSOP_PORT,
             difop_port=DIFOP_PORT, source_ip=None, max_packets=0,
-            duration=0, stop_event=None, on_ready=lambda: None):
+            duration=0, stop_event=None, on_ready=lambda: None,
+            receive_buffer_bytes=4 * 1024 * 1024):
     """Shared blocking receiver. Caller owns pipeline.finish() and reporting."""
     with selectors.DefaultSelector() as selector:
         sockets = []
@@ -15,7 +18,9 @@ def receive(pipeline, *, bind_ip="0.0.0.0", msop_port=MSOP_PORT,
             for port, kind in ((msop_port, MSOP_PORT), (difop_port, DIFOP_PORT)):
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sockets.append(sock)
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4 * 1024 * 1024)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, receive_buffer_bytes)
+                label = "msop" if kind == MSOP_PORT else "difop"
+                pipeline.stats[f"{label}_rcvbuf_bytes"] = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
                 sock.bind((bind_ip, port))
                 sock.setblocking(False)
                 selector.register(sock, selectors.EVENT_READ, kind)
@@ -33,8 +38,24 @@ def receive(pipeline, *, bind_ip="0.0.0.0", msop_port=MSOP_PORT,
                     if max_packets and pipeline.stats["received"] >= max_packets:
                         return
         finally:
+            drops = [socket_drops(sock) for sock in sockets]
+            if len(drops) == 2 and all(value is not None for value in drops):
+                pipeline.stats["udp_socket_drops"] = sum(drops)
             for sock in sockets:
                 sock.close()
+
+def socket_drops(sock):
+    """Linux per-socket kernel drops at shutdown; absent when unavailable."""
+    try:
+        inode = os.fstat(sock.fileno()).st_ino
+        for line in Path("/proc/net/udp").read_text().splitlines()[1:]:
+            fields = line.split()
+            if len(fields) >= 13 and int(fields[9]) == inode:
+                return int(fields[-1])
+    except (OSError, ValueError):
+        pass
+    return None
+
 
 def main():
     p = argparse.ArgumentParser(description="Receive E1R MSOP and DIFOP UDP")

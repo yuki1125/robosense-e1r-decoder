@@ -57,7 +57,7 @@ def test_receiver_failure_closes_visualizer(monkeypatch):
     def fail(*args, **kwargs):
         assert threading.get_ident() != main_thread
         raise OSError("address in use")
-    monkeypatch.setattr(viewer, "receive", fail)
+    monkeypatch.setattr(viewer, "receive_isolated", fail)
     fake = SimpleNamespace(visualization=SimpleNamespace(Visualizer=FakeVisualizer),
                            geometry=SimpleNamespace(PointCloud=SimpleNamespace))
     args = SimpleNamespace(bind_ip="127.0.0.1", msop_port=6699, difop_port=7788,
@@ -97,7 +97,7 @@ def test_file_end_and_window_close(monkeypatch, exit_on_end):
     def no_udp(*args, **kwargs):
         pytest.fail("File playback must not bind UDP sockets")
     monkeypatch.setattr(viewer, "play_capture", playback)
-    monkeypatch.setattr(viewer, "receive", no_udp)
+    monkeypatch.setattr(viewer, "receive_isolated", no_udp)
     fake = SimpleNamespace(visualization=SimpleNamespace(Visualizer=FakeVisualizer),
                            geometry=SimpleNamespace(PointCloud=SimpleNamespace),
                            utility=SimpleNamespace(Vector3dVector=lambda x: x))
