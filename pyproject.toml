@@ -10,6 +10,7 @@ dependencies = ["numpy>=1.23", "dpkt>=1.9.8"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+browser-test = ["playwright>=1.50", "psutil>=5"]
 viewer = [
     "open3d==0.18.0; sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'arm64')",
     "numpy<2; sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'arm64')",
@@ -21,3 +22,6 @@ include = ["e1r_decoder*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+e1r_decoder = ["share_viewer.html"]
