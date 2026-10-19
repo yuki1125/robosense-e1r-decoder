@@ -84,6 +84,10 @@ class FrameAssembler:
         result = E1RFrame(self.index, points, len(self.packets),
             float(points["timestamp"].min()), float(points["timestamp"].max()),
             not reasons, reasons, seqs)
+        captures = [p.capture_timestamp for p in self.packets if p.capture_timestamp is not None]
+        if captures:
+            result.capture_start_timestamp = min(captures)
+            result.capture_end_timestamp = max(captures)
         self.index += 1
         self.packets = []
         return result
