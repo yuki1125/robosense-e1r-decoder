@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>E1R 点群プレーヤー</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10151c;color:#e5edf7;font:14px system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}header{padding:16px 22px;border-bottom:1px solid #354352;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}h1{font-size:18px;margin:0}#name{color:#9caec3;overflow-wrap:anywhere}main{flex:1;position:relative;min-height:120px}canvas{width:100%;height:100%;display:block;touch-action:none}#status{position:absolute;left:20px;top:16px;background:#10151cdd;padding:9px 13px;border-radius:6px;max-width:90%;white-space:pre-wrap;pointer-events:none}#error{display:none;position:absolute;inset:15%;background:#351e25;padding:24px;border:1px solid #de7a84;border-radius:10px;white-space:pre-wrap;overflow:auto}footer{background:#19212b;padding:14px 22px 18px;border-top:1px solid #354352}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:7px 0}button,select{font:inherit;background:#263444;color:#edf4ff;border:1px solid #526279;border-radius:5px;padding:7px 12px;cursor:pointer}button:hover{background:#354a61}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #85caff}#play{background:#245f86;min-width:90px}#seek{flex:1;min-width:160px;accent-color:#66baff}#time{font-variant-numeric:tabular-nums;min-width:125px}#detail{color:#b7c6d8}small{color:#9eafc3;line-height:1.6}#warning{color:#ffc584}label{display:flex;align-items:center;gap:5px}
+</style>
+</head>
+<body>
+<header><h1>E1R 点群プレーヤー</h1><span id="name">読み込み中</span></header>
+<main><canvas id="canvas" aria-label="点群の3D表示"></canvas><div id="status" role="status">点群を準備中…</div><div id="error" role="alert"></div></main>
+<footer>
+<div class="row"><button id="previous" aria-label="前のフレーム">◀ 1コマ</button><button id="play">一時停止</button><button id="next" aria-label="次のフレーム">1コマ ▶</button><label>速度<select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><label><input id="repeat" type="checkbox">繰り返し</label><button id="fit">視点リセット</button><label>点サイズ<input id="point-size" type="range" min="1" max="8" value="2" aria-label="点サイズ"></label></div>
+<div class="row"><input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="再生位置"><span id="time">0:00 / 0:00</span></div>
+<div id="detail"> </div><div id="warning"></div>
+<small>左ドラッグ：回転 ／ 右ドラッグ・Shift＋ドラッグ：平行移動 ／ ホイール：拡大縮小<br>全点を保持したデータをオフラインで再生する。表示が追いつかない場合は待機する。</small>
+</footer>
+<noscript>点群の再生にはJavaScriptを有効にしたEdgeまたはChromeが必要。</noscript>
+<!-- E1R_DATA -->
+<script>
+'use strict';
+(() => {
+const $ = id => document.getElementById(id);
+let stopped = false, playing = true, busy = false, wanted = null, current = -1;
+let shownAt = 0, currentDrawCount = 0, fitted = false, cacheBytes = 0, decodedFrames = 0;
+const cache = new Map(), LIMIT = 128 * 1024 * 1024;
+let manifest, frames, gl, program, xyzBuffer, colorBuffer, camera, draw, pose;
+function fail(error) {
+  stopped = true; playing = false;
+  $('error').style.display = 'block';
+  $('error').textContent = '再生できない\n\n' + (error.message || String(error));
+  $('status').textContent = 'エラー';
+  document.querySelectorAll('button,input,select').forEach(e => e.disabled = true);
+}
+const finite = Number.isFinite;
+function validate() {
+  manifest = JSON.parse($('manifest').textContent);
+  if(manifest.version !== 1 || manifest.layout !== 'xyz-f32le,intensity-u8,timestamp-f64le') throw Error('未対応のデータ形式');
+  frames = manifest.frames;
+  if(!Array.isArray(frames) || !frames.length) throw Error('点群フレームがない');
+  let previous = 0;
+  frames.forEach((f, i) => {
+    if(f.index !== i || !Number.isSafeInteger(f.count) || f.count < 1 || f.bytes !== f.count*21 || f.bytes > LIMIT || !finite(f.time) || f.time < previous || !finite(f.end_time) || f.end_time < f.time || !Array.isArray(f.reasons) || !$('frame-'+i)) throw Error('フレームの索引が壊れている、または1フレームが128 MiBを超えている');
+    previous = f.time;
+  });
+  if(!finite(manifest.duration) || manifest.duration < frames.at(-1).time) throw Error('再生時間が不正');
+  if(!('DecompressionStream' in window)) throw Error('このブラウザーは圧縮データの展開に非対応。新しいEdgeまたはChromeで開く。');
+  if(new Uint8Array(new Uint32Array([1]).buffer)[0] !== 1) throw Error('この端末のバイト順には非対応');
+}
+async function loadFrame(i) {
+  if(cache.has(i)) {const f=cache.get(i); cache.delete(i); cache.set(i,f); return f;}
+  const meta=frames[i];
+  while(cache.size && (cache.size>=3 || cacheBytes+meta.bytes>LIMIT)) {const key=cache.keys().next().value; cacheBytes-=cache.get(key).buffer.byteLength; cache.delete(key);}
+  let text=$('frame-'+i).textContent.trim();
+  if(text.length > Math.ceil((meta.bytes+65536)*4/3)) throw Error('圧縮フレームのサイズが不正');
+  let binary=atob(text), compressed=new Uint8Array(binary.length);
+  for(let j=0;j<binary.length;j++) compressed[j]=binary.charCodeAt(j);
+  binary=null; text=null;
+  const reader=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+  const bytes=new Uint8Array(meta.bytes); let offset=0;
+  try {
+    while(true) {const {value,done}=await reader.read(); if(done) break;
+      if(offset+value.byteLength>bytes.length) throw Error('展開サイズが索引と一致しない');
+      bytes.set(value,offset); offset+=value.byteLength;
+    }
+  } catch(error) {await reader.cancel().catch(()=>{}); throw error;}
+  if(offset!==bytes.length) throw Error('フレームデータが途中で切れている');
+  const value={buffer:bytes.buffer, xyz:new Float32Array(bytes.buffer,0,meta.count*3), intensity:new Uint8Array(bytes.buffer,meta.count*12,meta.count)};
+  cache.set(i,value); cacheBytes+=bytes.byteLength; decodedFrames++;
+  return value;
+}
+const sub=(a,b)=>a.map((v,i)=>v-b[i]);
+const dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0);
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const n=Math.hypot(...a)||1;return a.map(v=>v/n)};
+function multiply(a,b){const c=new Float32Array(16);for(let col=0;col<4;col++)for(let row=0;row<4;row++)for(let k=0;k<4;k++)c[col*4+row]+=a[k*4+row]*b[col*4+k];return c;}
+function initGL() {
+ const canvas=$('canvas'); gl=canvas.getContext('webgl2',{antialias:true,alpha:false});
+ if(!gl) throw Error('WebGL2を開始できない。Edge/Chromeのグラフィックアクセラレーション設定とGPUドライバーを確認する。');
+ const shader=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
+ program=gl.createProgram();
+ gl.attachShader(program,shader(gl.VERTEX_SHADER,`#version 300 es
+ in vec3 position; in float intensity; uniform mat4 mvp; uniform float size; out float brightness;
+ void main(){gl_Position=mvp*vec4(position,1.0);gl_PointSize=size;brightness=0.25+0.75*sqrt(intensity);}`));
+ gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`#version 300 es
+ precision mediump float; in float brightness; out vec4 color;
+ void main(){if(length(gl_PointCoord-vec2(0.5))>0.5)discard;color=vec4(vec3(brightness),1.0);}`));
+ gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+ gl.useProgram(program);gl.enable(gl.DEPTH_TEST);gl.clearColor(.055,.075,.10,1);
+ xyzBuffer=gl.createBuffer();colorBuffer=gl.createBuffer();
+ const position=gl.getAttribLocation(program,'position'), intensity=gl.getAttribLocation(program,'intensity');
+ gl.bindBuffer(gl.ARRAY_BUFFER,xyzBuffer);gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,3,gl.FLOAT,false,0,0);
+ gl.bindBuffer(gl.ARRAY_BUFFER,colorBuffer);gl.enableVertexAttribArray(intensity);gl.vertexAttribPointer(intensity,1,gl.UNSIGNED_BYTE,true,0,0);
+ const mvp=gl.getUniformLocation(program,'mvp'), size=gl.getUniformLocation(program,'size');
+ camera={target:[0,0,0],distance:10,theta:.8,phi:1.05};
+ pose=()=>{const c=camera, eye=c.target.map((v,i)=>v+c.distance*[Math.sin(c.phi)*Math.cos(c.theta),Math.sin(c.phi)*Math.sin(c.theta),Math.cos(c.phi)][i]);const z=norm(sub(eye,c.target)), x=norm(cross([0,0,1],z)), y=cross(z,x);return {eye,x,y,z};};
+ draw=()=>{
+   const scale=Math.min(window.devicePixelRatio||1,2), w=Math.max(1,Math.round(canvas.clientWidth*scale)), h=Math.max(1,Math.round(canvas.clientHeight*scale));
+   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);
+   const {eye,x,y,z}=pose();const view=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);
+   const n=Math.max(.0001,camera.distance/10000),f=Math.max(1000,camera.distance*100),t=1/Math.tan(Math.PI/8);
+   const proj=new Float32Array([t/(w/h),0,0,0,0,t,0,0,0,0,(f+n)/(n-f),-1,0,0,2*f*n/(n-f),0]);
+   gl.uniformMatrix4fv(mvp,false,multiply(proj,view));gl.uniform1f(size,Number($('point-size').value)*scale);
+   gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.drawArrays(gl.POINTS,0,currentDrawCount);
+ };
+ canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('グラフィックスの接続が失われた。HTMLを開き直す。'));});
+ let drag=null;
+ canvas.oncontextmenu=e=>e.preventDefault();
+ canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY,pan:e.button===2||e.shiftKey};canvas.setPointerCapture(e.pointerId);};
+ canvas.onpointerup=canvas.onpointercancel=()=>{drag=null;};
+ canvas.onpointermove=e=>{if(!drag||stopped)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;if(drag.pan){const {x,y}=pose();camera.target=camera.target.map((v,i)=>v+(-dx*x[i]+dy*y[i])*camera.distance*.0015);}else{camera.theta-=dx*.006;camera.phi=Math.max(.01,Math.min(Math.PI-.01,camera.phi+dy*.006));}draw();};
+ canvas.addEventListener('wheel',e=>{e.preventDefault();camera.distance=Math.max(.001,Math.min(1e7,camera.distance*Math.exp(e.deltaY*.001)));draw();},{passive:false});
+ window.addEventListener('resize',draw);$('point-size').oninput=draw;
+}
+function fit(){
+ const box=frames[Math.max(0,current)].bounds;
+ if(box&&box.length===2&&box.flat().every(finite)) {camera.target=box[0].map((v,i)=>(v+box[1][i])/2);const radius=Math.hypot(...sub(box[1],box[0]))/2;camera.distance=Math.max(.1,radius/Math.sin(Math.PI/8)*1.15);}
+ camera.theta=.8;camera.phi=1.05;draw();
+}
+function clock(t){return Math.floor(t/60)+':'+(t%60).toFixed(1).padStart(4,'0');}
+function update(){
+ const f=frames[current];$('seek').value=String(current);$('play').textContent=playing?'一時停止':'再生';
+ $('time').textContent=clock(f.time)+' / '+clock(manifest.duration);
+ $('detail').textContent=`フレーム ${current+1} / ${frames.length} · ${f.count.toLocaleString()} 点`+(f.nonfinite?` · 非有限座標 ${f.nonfinite} 点は表示対象外`:'');
+ $('warning').textContent=(f.complete?'':'不完全なフレーム：'+f.reasons.join(', '))+(manifest.capture_regressions?' ／ 記録時刻の逆行あり（再生時刻を補正）':'');
+ $('status').textContent=playing?'再生中':'一時停止';
+}
+async function requestFrame(i){
+ wanted=Math.max(0,Math.min(frames.length-1,i));
+ if(busy)return;busy=true;
+ try{
+  while(wanted!==null&&!stopped){
+   const index=wanted;wanted=null;$('status').textContent='読み込み中…';
+   const f=await loadFrame(index);
+   if(wanted!==null)continue;
+   let xyz=f.xyz,intensity=f.intensity;
+   if(frames[index].nonfinite){const good=[];for(let j=0;j<intensity.length;j++)if(finite(xyz[j*3])&&finite(xyz[j*3+1])&&finite(xyz[j*3+2]))good.push(j);const positions=new Float32Array(good.length*3),colors=new Uint8Array(good.length);good.forEach((j,k)=>{positions.set(xyz.subarray(j*3,j*3+3),k*3);colors[k]=intensity[j];});xyz=positions;intensity=colors;}
+   gl.bindBuffer(gl.ARRAY_BUFFER,xyzBuffer);gl.bufferData(gl.ARRAY_BUFFER,xyz,gl.DYNAMIC_DRAW);
+   gl.bindBuffer(gl.ARRAY_BUFFER,colorBuffer);gl.bufferData(gl.ARRAY_BUFFER,intensity,gl.DYNAMIC_DRAW);
+   currentDrawCount=intensity.length;current=index;
+   if(!fitted){fit();fitted=true;}else draw();
+   shownAt=performance.now();update();
+   if(wanted===null&&index+1<frames.length)await loadFrame(index+1);
+  }
+ }catch(error){fail(error);}finally{busy=false;}
+}
+function animate(now){
+ if(stopped)return;
+ if(playing&&!busy&&current>=0){
+   const delay=(current+1<frames.length?frames[current+1].time-frames[current].time:Math.max(.01,manifest.duration-frames[current].time))*1000/Number($('speed').value);
+   if(now-shownAt>=delay){if(current+1<frames.length)requestFrame(current+1);else if($('repeat').checked)requestFrame(0);else{playing=false;update();$('status').textContent='再生終了';}}
+ }
+ requestAnimationFrame(animate);
+}
+try{
+ validate();initGL();$('name').textContent=manifest.title;$('seek').max=String(frames.length-1);
+ $('play').onclick=()=>{playing=!playing;shownAt=performance.now();if(playing&&current===frames.length-1)requestFrame(0);else if(current>=0)update();};
+ $('previous').onclick=()=>{playing=false;requestFrame(current-1);};$('next').onclick=()=>{playing=false;requestFrame(current+1);};
+ $('seek').oninput=()=>{playing=false;requestFrame(Number($('seek').value));};
+ $('fit').onclick=fit;$('speed').onchange=()=>{shownAt=performance.now();};
+ window.addEventListener('keydown',e=>{if(e.code==='Space'&&!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)){e.preventDefault();$('play').click();}});
+ // Read-only diagnostics for regression and memory measurements.
+ window.e1rViewer={getState:()=>({current,playing,busy,failed:stopped,frames:frames.length,points:manifest.points,drawn:currentDrawCount,cacheFrames:cache.size,cacheBytes,decodedFrames,camera:JSON.parse(JSON.stringify(camera))})};
+ requestFrame(0);requestAnimationFrame(animate);
+}catch(error){fail(error);}
+})();
+</script>
+</body>
+</html>
