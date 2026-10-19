@@ -40,6 +40,8 @@ class E1RFrame:
     complete: bool
     reasons: list[str] = field(default_factory=list)
     sequences: list[int] = field(default_factory=list)
+    capture_start_timestamp: float | None = None
+    capture_end_timestamp: float | None = None
 
 @dataclass
 class E1RImu:
